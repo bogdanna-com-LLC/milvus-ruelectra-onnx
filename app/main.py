@@ -1,64 +1,50 @@
-﻿from fastapi import FastAPI, Query
+﻿from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
-from typing import Dict, Any
+from typing import List
+import numpy as np
+from model import get_embedding_model
 
-from .gpu_utils import GPUManager
-
-# Initialize FastAPI application
-app = FastAPI(
-    title="GPU Information Service",
-    description="A simple FastAPI service to retrieve GPU information and perform computations"
-)
-
-# Initialize GPU Manager
-gpu_manager = GPUManager()
+app = FastAPI(title="ruElectra Embeddings API")
 
 
-class ComputationRequest(BaseModel):
+class TextInput(BaseModel):
+    texts: List[str]
+
+
+class EmbeddingResponse(BaseModel):
+    embeddings: List[List[float]]
+    dimensions: int
+
+
+@app.on_event("startup")
+async def startup_event():
+    # Load model at startup to avoid loading it for each request
+    get_embedding_model()
+
+
+@app.post("/embeddings", response_model=EmbeddingResponse)
+async def create_embeddings(input_data: TextInput):
     """
-    Pydantic model for computation request
+    Generate embeddings for the provided texts
     """
-    matrix_size: int = 10000
+    try:
+        model = get_embedding_model()
+        embeddings = model.generate_embeddings(input_data.texts)
 
+        # Convert to Python list for JSON serialization
+        embeddings_list = embeddings.tolist()
 
-@app.get("/gpu/info")
-async def get_gpu_information() -> Dict[str, Any]:
-    """
-    Endpoint to retrieve GPU system information
-
-    :return: Dictionary with GPU details
-    """
-    return gpu_manager.get_gpu_info()
-
-
-@app.post("/gpu/compute")
-async def perform_gpu_computation(
-    request: ComputationRequest = ComputationRequest()
-) -> Dict[str, Any]:
-    """
-    Perform a compute-intensive task on GPU
-
-    :param request: Computation request with matrix size
-    :return: Computation metrics
-    """
-    return gpu_manager.perform_gpu_computation(request.matrix_size)
+        return {
+            "embeddings": embeddings_list,
+            "dimensions": embeddings.shape[1]
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error generating embeddings: {str(e)}")
 
 
 @app.get("/health")
-async def health_check() -> Dict[str, str]:
+async def health_check():
     """
     Simple health check endpoint
-
-    :return: Service status
     """
-    return {
-        "status": "healthy",
-        "message": "GPU Information Service is running"
-    }
-
-
-# Optional: Run directly for testing
-if __name__ == "__main__":
-    import uvicorn
-
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    return {"status": "healthy"}
