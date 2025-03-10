@@ -5,6 +5,12 @@ __pycache__/
 .cadence
 .venv
 
+# Ignore PyCharm specific files
+.idea/
+*.iml
+*.iws
+*.ipr
+
 # C extensions
 *.so
 
