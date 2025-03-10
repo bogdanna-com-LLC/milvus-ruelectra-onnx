@@ -1,8 +1,0 @@
-﻿fastapi
-uvicorn
-torch
-pydantic
-numpy
-transformers
-sentencepiece
-protobuf
