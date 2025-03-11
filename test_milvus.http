@@ -1,0 +1,174 @@
+### Health Check
+GET http://localhost:8000/health
+
+### Generate Embeddings
+POST http://localhost:8000/embeddings
+Content-Type: application/json
+
+{
+  "texts": [
+    "Искусственный интеллект был основан как научная дисциплина в 1956 году.",
+    "Алан Тьюринг был первым человеком, кто провёл существенные исследования в области ИИ.",
+    "Родившийся в Мейда-Вейл, Лондон, Тьюринг был воспитан в южной Англии."
+  ]
+}
+
+### ----- COLLECTION MANAGEMENT -----
+
+### List Collections
+GET http://localhost:8000/milvus/collections
+
+### Create Test Collection
+POST http://localhost:8000/milvus/collections
+Content-Type: application/json
+
+{
+  "collection_name": "test_collection",
+  "dimension": 256,
+  "metric_type": "COSINE"
+}
+
+### Describe Default Collection
+GET http://localhost:8000/milvus/collections/embeddings_collection
+
+### Describe Test Collection
+GET http://localhost:8000/milvus/collections/test_collection
+
+### Count Default Collection
+GET http://localhost:8000/milvus/collections/embeddings_collection/count
+
+### Count Test Collection
+GET http://localhost:8000/milvus/collections/test_collection/count
+
+### ----- DATA OPERATIONS -----
+
+### Insert to Test Collection
+POST http://localhost:8000/milvus/insert
+Content-Type: application/json
+
+{
+  "collection_name": "test_collection",
+  "items": [
+    {
+      "text": "Искусственный интеллект был основан как научная дисциплина в 1956 году.",
+      "metadata": {
+        "subject": "история ИИ",
+        "language": "ru"
+      }
+    },
+    {
+      "text": "Алан Тьюринг был первым человеком, кто провёл существенные исследования в области ИИ.",
+      "metadata": {
+        "subject": "история ИИ",
+        "language": "ru",
+        "person": "Алан Тьюринг"
+      }
+    }
+  ]
+}
+
+### Count Both Collections After Insert
+GET http://localhost:8000/milvus/count
+
+### Count Test Collection After Insert
+GET http://localhost:8000/milvus/collections/test_collection/count
+
+### ----- SEARCH OPERATIONS -----
+
+### Search in Default Collection
+POST http://localhost:8000/milvus/search
+Content-Type: application/json
+
+{
+  "texts": ["Кто такой Алан Тьюринг?"],
+  "limit": 3,
+  "output_fields": ["text", "subject", "person"]
+}
+
+### Search in Test Collection
+POST http://localhost:8000/milvus/search
+Content-Type: application/json
+
+{
+  "texts": ["Что такое искусственный интеллект?"],
+  "collection_name": "test_collection",
+  "limit": 3,
+  "output_fields": ["text", "subject", "language"]
+}
+
+### Search with Filter
+POST http://localhost:8000/milvus/search
+Content-Type: application/json
+
+{
+  "texts": ["Кто такой Алан Тьюринг?"],
+  "limit": 3,
+  "output_fields": ["text", "subject", "person"],
+  "filter": "subject == 'биография'"
+}
+
+### ----- QUERY OPERATIONS -----
+
+### Query Default Collection by Filter
+POST http://localhost:8000/milvus/query
+Content-Type: application/json
+
+{
+  "filter": "subject == 'история ИИ'",
+  "output_fields": ["text", "subject", "person"]
+}
+
+### Query Test Collection by Filter
+POST http://localhost:8000/milvus/query
+Content-Type: application/json
+
+{
+  "collection_name": "test_collection",
+  "filter": "subject == 'история ИИ'",
+  "output_fields": ["text", "subject", "person"]
+}
+
+### Query by ID (replace with actual IDs from your system)
+POST http://localhost:8000/milvus/query
+Content-Type: application/json
+
+{
+  "ids": [1, 2],
+  "output_fields": ["text", "subject", "person"]
+}
+
+### ----- DELETE OPERATIONS -----
+
+### Delete from Default Collection by Filter
+POST http://localhost:8000/milvus/delete
+Content-Type: application/json
+
+{
+  "filter": "subject == 'биография'"
+}
+
+### Delete from Test Collection by Filter
+POST http://localhost:8000/milvus/delete
+Content-Type: application/json
+
+{
+  "collection_name": "test_collection",
+  "filter": "subject == 'история ИИ'"
+}
+
+### Delete by ID (replace with actual IDs from your system)
+POST http://localhost:8000/milvus/delete
+Content-Type: application/json
+
+{
+  "ids": [1]
+}
+
+### Count After Delete
+GET http://localhost:8000/milvus/count
+
+### Count Test Collection After Delete
+GET http://localhost:8000/milvus/collections/test_collection/count
+
+### Drop Test Collection
+DELETE http://localhost:8000/milvus/collections/test_collection
