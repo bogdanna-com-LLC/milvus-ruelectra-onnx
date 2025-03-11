@@ -39,7 +39,7 @@ RUN mkdir -p /app/models /app/data
 # Added pymilvus to the packages
 RUN pip install --upgrade pip && \
     pip install --no-cache-dir numpy==1.24.3 && \
-    pip install --no-cache-dir fastapi==0.103.1 uvicorn==0.23.2 pydantic==2.3.0 && \
+    pip install --no-cache-dir fastapi==0.103.1 uvicorn==0.23.2 pydantic==2.3.0 pydantic-settings==2.0.3 && \
     pip install --no-cache-dir onnxruntime==1.15.1 && \
     pip install --no-cache-dir transformers==4.30.2 && \
     pip install --no-cache-dir pymilvus && \
