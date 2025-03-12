@@ -1,0 +1,26 @@
+﻿services:
+  ruelectra-embeddings:
+    image: iamfromrussia/milvus-ruelectra-onnx:slim-cpu
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+    environment:
+      - MODEL_PATH=/app/models/ruelectra_small.onnx
+      - TOKENIZER_PATH=/app/models/onnx_tokenizer
+      - MILVUS_DB_PATH=/app/data/milvus_data.db
+      - MILVUS_COLLECTION=embeddings_collection
+      - EMBEDDING_DIMENSION=256
+      - MAX_TOKEN_LENGTH=512
+      - MILVUS_METRIC_TYPE=L2
+    volumes:
+      - milvus_data:/app/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
+volumes:
+  milvus_data:
+    name: milvus_vector_data
