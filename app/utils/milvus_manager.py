@@ -361,34 +361,7 @@ class MilvusManager:
             logger.info(f"Search completed with {len(search_results)} result sets")
             return search_results
         except Exception as e:
-            error_msg = str(e)
-            logger.error(f"Search error: {error_msg}")
-            
-            # We still keep the emergency reset just in case
-            if "metric type not match" in error_msg:
-                logger.warning("Detected metric type mismatch. Attempting emergency collection reset.")
-                try:
-                    from utils.reset_collections import reset_collections
-                    
-                    # Emergency reset of all collections
-                    success = reset_collections(self.db_path, self.metric_type)
-                    if success:
-                        logger.info("Collection reset successful. Retrying search.")
-                        # Try search again
-                        search_results = self.client.search(
-                            collection_name=col_name,
-                            data=query_embeddings,
-                            limit=limit,
-                            output_fields=output_fields,
-                            filter=filter
-                        )
-                        logger.info(f"Search after reset completed with {len(search_results)} result sets")
-                        return search_results
-                    else:
-                        logger.error("Collection reset failed.")
-                except Exception as reset_error:
-                    logger.error(f"Error during emergency collection reset: {str(reset_error)}")
-            
+            logger.error(f"Search error: {str(e)}")
             # If we get here, all attempts failed
             raise RuntimeError(f"Failed to search embeddings: {str(e)}")
     
