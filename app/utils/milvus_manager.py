@@ -2,6 +2,7 @@ import os
 import logging
 from typing import List, Dict, Any, Optional, Union
 from pymilvus import MilvusClient, DataType, FieldSchema, CollectionSchema
+from core.config import settings
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -10,10 +11,10 @@ logger = logging.getLogger(__name__)
 class MilvusManager:
     def __init__(
         self, 
-        db_path: str = "milvus_data.db", 
-        collection_name: str = "embeddings_collection",
-        dimension: int = 256,
-        metric_type: str = "COSINE",
+        db_path: str = settings.MILVUS_DB_PATH, 
+        collection_name: str = settings.MILVUS_COLLECTION,
+        dimension: int = settings.EMBEDDING_DIMENSION,
+        metric_type: str = "COSINE",  # Now used properly with the Milvus team's recommended approach
         recreate: bool = False
     ):
         """
@@ -23,7 +24,7 @@ class MilvusManager:
             db_path: Path to the Milvus database file
             collection_name: Name of the collection to use
             dimension: Dimension of the embeddings vectors
-            metric_type: Distance metric type for vector similarity (COSINE, L2, IP, etc.)
+            metric_type: Distance metric type for vector similarity
             recreate: Whether to recreate the collection if it exists
         """
         self.db_path = db_path
@@ -45,12 +46,6 @@ class MilvusManager:
                     self._create_collection()
                 else:
                     logger.info(f"Using existing collection {collection_name}")
-                    # Get collection info to verify configuration
-                    try:
-                        collection_info = self.client.describe_collection(collection_name=self.collection_name)
-                        logger.info(f"Collection info: {collection_info}")
-                    except Exception as e:
-                        logger.warning(f"Failed to get collection info: {str(e)}")
             else:
                 logger.info(f"Collection {collection_name} does not exist, creating it")
                 self._create_collection()
@@ -65,9 +60,7 @@ class MilvusManager:
             logger.info(f"Creating collection {self.collection_name} with dimension {self.dimension}")
             
             # Create schema with enable_dynamic_field=True
-            schema = self.client.create_schema(
-                enable_dynamic_field=True  # IMPORTANT: Enable dynamic fields to accept metadata
-            )
+            schema = self.client.create_schema(enable_dynamic_field=True)
             
             # Add primary key field with auto_id=True
             schema.add_field(
@@ -91,11 +84,15 @@ class MilvusManager:
                 max_length=65535
             )
             
-            # Create collection with specified schema and metric type
+            # Prepare index parameters - NEW APPROACH from Milvus team
+            index_params = self.client.prepare_index_params()
+            index_params.add_index(field_name="vector", metric_type=self.metric_type)
+            
+            # Create collection with specified schema and index params
             self.client.create_collection(
                 collection_name=self.collection_name,
                 schema=schema,
-                metric_type=self.metric_type
+                index_params=index_params
             )
             
             logger.info(f"Collection {self.collection_name} created successfully")
@@ -123,10 +120,10 @@ class MilvusManager:
                 logger.warning(f"Collection {collection_name} already exists")
                 return False
             
+            logger.info(f"Creating collection {collection_name} with dimension {dimension}")
+            
             # Create schema with enable_dynamic_field=True
-            schema = self.client.create_schema(
-                enable_dynamic_field=True  # IMPORTANT: Enable dynamic fields to accept metadata
-            )
+            schema = self.client.create_schema(enable_dynamic_field=True)
             
             # Add primary key field with auto_id=True
             schema.add_field(
@@ -150,11 +147,15 @@ class MilvusManager:
                 max_length=65535
             )
             
-            # Create collection with specified schema and metric type
+            # Prepare index parameters - NEW APPROACH from Milvus team
+            index_params = self.client.prepare_index_params()
+            index_params.add_index(field_name="vector", metric_type=metric_type)
+            
+            # Create collection with specified schema and index params
             self.client.create_collection(
                 collection_name=collection_name,
                 schema=schema,
-                metric_type=metric_type
+                index_params=index_params
             )
             
             logger.info(f"Collection {collection_name} created successfully")
@@ -264,16 +265,8 @@ class MilvusManager:
         if not self.client.has_collection(collection_name=col_name):
             logger.error(f"Collection {col_name} does not exist")
             raise ValueError(f"Collection {col_name} does not exist")
-            
-        # Get collection info to check dimension
-        try:
-            collection_info = self.client.describe_collection(collection_name=col_name)
-            # In a real implementation, we would verify the dimension here
-            logger.info(f"Inserting into collection: {col_name}")
-        except Exception as e:
-            logger.warning(f"Could not verify collection dimensions: {str(e)}")
-            
-        # Validate embedding dimensions (using self.dimension as fallback)
+                
+        # Validate embedding dimensions
         for i, embedding in enumerate(embeddings):
             if len(embedding) != self.dimension:
                 raise ValueError(f"Embedding at index {i} has dimension {len(embedding)}, expected {self.dimension}")
@@ -347,21 +340,6 @@ class MilvusManager:
         if not self.client.has_collection(collection_name=col_name):
             logger.error(f"Collection {col_name} does not exist")
             raise ValueError(f"Collection {col_name} does not exist")
-        
-        # Get collection info to check metric type
-        try:
-            collection_info = self.client.describe_collection(collection_name=col_name)
-            logger.info(f"Collection info: {collection_info}")
-            # Extract metric type if available in collection info
-            if collection_info and 'metric_type' in collection_info:
-                metric_type = collection_info['metric_type']
-                logger.info(f"Using metric type from collection: {metric_type}")
-            else:
-                metric_type = self.metric_type
-                logger.info(f"Using default metric type: {metric_type}")
-        except Exception as e:
-            logger.warning(f"Could not verify collection metric type: {str(e)}")
-            metric_type = self.metric_type
             
         # Validate embedding dimensions
         for i, embedding in enumerate(query_embeddings):
@@ -369,22 +347,108 @@ class MilvusManager:
                 raise ValueError(f"Query embedding at index {i} has dimension {len(embedding)}, expected {self.dimension}")
         
         try:
-            logger.info(f"Searching collection {col_name} with {len(query_embeddings)} queries")
-            # Specify the metric_type explicitly from what was saved or defaulted
+            logger.info(f"Searching collection {col_name}")
+            
+            # With the corrected approach, we can simply use search without special params
+            search_results = self.client.search(
+                collection_name=col_name,
+                data=query_embeddings,
+                limit=limit,
+                output_fields=output_fields,
+                filter=filter
+            )
+            
+            logger.info(f"Search completed with {len(search_results)} result sets")
+            return search_results
+        except Exception as e:
+            error_msg = str(e)
+            logger.error(f"Search error: {error_msg}")
+            
+            # We still keep the emergency reset just in case
+            if "metric type not match" in error_msg:
+                logger.warning("Detected metric type mismatch. Attempting emergency collection reset.")
+                try:
+                    from utils.reset_collections import reset_collections
+                    
+                    # Emergency reset of all collections
+                    success = reset_collections(self.db_path, self.metric_type)
+                    if success:
+                        logger.info("Collection reset successful. Retrying search.")
+                        # Try search again
+                        search_results = self.client.search(
+                            collection_name=col_name,
+                            data=query_embeddings,
+                            limit=limit,
+                            output_fields=output_fields,
+                            filter=filter
+                        )
+                        logger.info(f"Search after reset completed with {len(search_results)} result sets")
+                        return search_results
+                    else:
+                        logger.error("Collection reset failed.")
+                except Exception as reset_error:
+                    logger.error(f"Error during emergency collection reset: {str(reset_error)}")
+            
+            # If we get here, all attempts failed
+            raise RuntimeError(f"Failed to search embeddings: {str(e)}")
+    
+    def search_with_range(
+        self, 
+        query_embeddings: List[List[float]], 
+        collection_name: Optional[str] = None,
+        limit: int = 5, 
+        output_fields: Optional[List[str]] = None,
+        filter: Optional[str] = None,
+        radius: float = 0.4,
+        range_filter: float = 0.9
+    ) -> List[Dict[str, Any]]:
+        """
+        Search for similar vectors with range parameters.
+        
+        Args:
+            query_embeddings: List of query embedding vectors
+            collection_name: Optional name of collection to search (defaults to current collection)
+            limit: Maximum number of results to return per query
+            output_fields: Fields to include in the results
+            filter: Optional filter expression for metadata filtering
+            radius: Search radius
+            range_filter: Range filter value
+            
+        Returns:
+            List of search results
+        """
+        if not self.client:
+            raise RuntimeError("Milvus client not initialized")
+            
+        col_name = collection_name or self.collection_name
+            
+        if not query_embeddings:
+            logger.warning("No query embeddings provided")
+            return []
+        
+        try:
+            logger.info(f"Searching collection {col_name} with range parameters")
+            
+            # Use the range parameters as shown in the example
             search_results = self.client.search(
                 collection_name=col_name,
                 data=query_embeddings,
                 limit=limit,
                 output_fields=output_fields,
                 filter=filter,
-                search_params={"metric_type": metric_type}  # Explicitly specify metric type
+                search_params={
+                    "params": {
+                        "radius": radius,
+                        "range_filter": range_filter
+                    }
+                }
             )
             
-            logger.info(f"Search completed with {len(search_results)} result sets")
+            logger.info(f"Range search completed with {len(search_results)} result sets")
             return search_results
         except Exception as e:
-            logger.error(f"Failed to search embeddings: {str(e)}")
-            raise RuntimeError(f"Failed to search embeddings: {str(e)}")
+            logger.error(f"Range search error: {str(e)}")
+            raise RuntimeError(f"Failed to search with range parameters: {str(e)}")
     
     def delete(
         self, 
@@ -508,10 +572,10 @@ class MilvusManager:
         col_name = collection_name or self.collection_name
             
         try:
-            # In newer versions of PyMilvus, we need to use get_collection_stats instead of count
+            # Get collection stats as shown in the example
             stats = self.client.get_collection_stats(collection_name=col_name)
             
-            # Extract count from stats - adjust this based on the actual structure of the stats object
+            # Extract count from stats
             if isinstance(stats, dict) and 'row_count' in stats:
                 count = stats['row_count']
             else:

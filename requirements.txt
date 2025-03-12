@@ -1,0 +1,22 @@
+﻿# Core web framework
+fastapi>=0.105.0
+uvicorn>=0.24.0
+pydantic>=2.5.0
+pydantic-settings>=2.1.0
+
+# Machine learning and embedding components
+transformers>=4.36.0
+onnxruntime>=1.16.0
+numpy>=1.26.0
+protobuf>=4.24.0
+
+# Milvus vector database
+pymilvus>=2.4.2
+
+# Testing and development (optional)
+pytest>=7.4.3
+httpx>=0.25.0
+python-dotenv>=1.0.0
+
+# Optimization (optional)
+torch>=2.1.0  # Only needed if you're converting models to ONNX

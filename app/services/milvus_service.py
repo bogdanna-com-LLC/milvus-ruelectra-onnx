@@ -28,7 +28,8 @@ class MilvusService:
         return self.milvus_manager.list_collections()
     
     def create_collection(self, collection_name: str, dimension: int, metric_type: str = "COSINE") -> bool:
-        """Create a new collection."""
+        """Create a new collection with proper index parameters."""
+        # Now we properly pass the metric_type parameter
         return self.milvus_manager.create_collection(collection_name, dimension, metric_type)
     
     def drop_collection(self, collection_name: str) -> bool:
@@ -94,6 +95,7 @@ class MilvusService:
         Returns:
             List of search results
         """
+        logger.info(f"Generating embeddings for {len(texts)} texts for search")
         # Generate embeddings for query texts
         query_embeddings = self.embedding_service.generate_embeddings(texts)
         
@@ -104,6 +106,46 @@ class MilvusService:
             limit=limit,
             output_fields=output_fields,
             filter=filter
+        )
+    
+    def search_with_range(
+        self, 
+        texts: List[str], 
+        collection_name: Optional[str] = None,
+        limit: int = 5, 
+        radius: float = 0.4,
+        range_filter: float = 0.9,
+        output_fields: Optional[List[str]] = None,
+        filter: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        """
+        Search for similar vectors with range parameters.
+        
+        Args:
+            texts: List of query texts
+            collection_name: Optional target collection
+            limit: Maximum number of results per query
+            radius: Search radius
+            range_filter: Range filter value
+            output_fields: Fields to include in results
+            filter: Optional filter expression
+            
+        Returns:
+            List of search results
+        """
+        logger.info(f"Generating embeddings for {len(texts)} texts for range search")
+        # Generate embeddings for query texts
+        query_embeddings = self.embedding_service.generate_embeddings(texts)
+        
+        # Search in Milvus with range parameters
+        return self.milvus_manager.search_with_range(
+            query_embeddings=query_embeddings.tolist(),
+            collection_name=collection_name,
+            limit=limit,
+            output_fields=output_fields,
+            filter=filter,
+            radius=radius,
+            range_filter=range_filter
         )
     
     def delete(

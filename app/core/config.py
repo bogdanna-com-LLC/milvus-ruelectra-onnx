@@ -19,7 +19,7 @@ class Settings(BaseSettings):
     MILVUS_DB_PATH: str = Field(default="/app/data/milvus_data.db")
     MILVUS_COLLECTION: str = Field(default="embeddings_collection")
     EMBEDDING_DIMENSION: int = Field(default=256)
-    MILVUS_METRIC_TYPE: str = Field(default="COSINE")
+    MILVUS_METRIC_TYPE: str = Field(default="COSINE")  # This is now hardcoded to COSINE only
 
     class Config:
         env_file = ".env"
@@ -34,5 +34,5 @@ settings = Settings(
     MILVUS_COLLECTION=os.environ.get("MILVUS_COLLECTION", "embeddings_collection"),
     EMBEDDING_DIMENSION=int(os.environ.get("EMBEDDING_DIMENSION", "256")),
     MAX_TOKEN_LENGTH=int(os.environ.get("MAX_TOKEN_LENGTH", "512")),
-    MILVUS_METRIC_TYPE=os.environ.get("MILVUS_METRIC_TYPE", "COSINE"),
+    MILVUS_METRIC_TYPE="COSINE",  # Ignore env var, always use COSINE
 )

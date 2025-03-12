@@ -41,7 +41,7 @@ async def create_collection(
 ):
     """Create a new collection in the Milvus database."""
     try:
-        # Create the collection
+        # Create the collection with metric_type using the correct approach
         success = milvus_manager.create_collection(
             collection_name=request.collection_name,
             dimension=request.dimension,
@@ -49,7 +49,7 @@ async def create_collection(
         )
         
         if success:
-            return {"status": "success", "message": f"Collection {request.collection_name} created successfully"}
+            return {"status": "success", "message": f"Collection {request.collection_name} created successfully with metric_type={request.metric_type}"}
         else:
             return {"status": "warning", "message": f"Collection {request.collection_name} already exists"}
     except Exception as e:

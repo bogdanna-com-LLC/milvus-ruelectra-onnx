@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 import logging
+from typing import Optional
 from transformers import AutoTokenizer
 import onnxruntime as ort
 
@@ -10,6 +11,7 @@ from models.milvus_models import (
     BatchTextWithMetadata,
     MilvusInsertResponse,
     MilvusSearchRequest,
+    MilvusRangeSearchRequest,
     MilvusDeleteRequest,
     MilvusQueryRequest,
     CollectionCountResponse
@@ -73,6 +75,36 @@ async def search_milvus(
         raise HTTPException(status_code=500, detail=f"Error searching in Milvus: {str(e)}")
 
 
+@router.post("/search/range")
+async def search_milvus_with_range(
+    search_request: MilvusRangeSearchRequest,
+    milvus_manager: MilvusManager = Depends(get_milvus_manager),
+    tokenizer: AutoTokenizer = Depends(get_tokenizer),
+    ort_session: ort.InferenceSession = Depends(get_ort_session)
+):
+    """Search for similar embeddings in Milvus with range parameters."""
+    try:
+        # Create services
+        embedding_service = EmbeddingService(tokenizer, ort_session)
+        milvus_service = MilvusService(milvus_manager, embedding_service)
+        
+        # Search in Milvus with range parameters
+        results = milvus_service.search_with_range(
+            texts=search_request.texts,
+            collection_name=search_request.collection_name,
+            limit=search_request.limit,
+            radius=search_request.radius,
+            range_filter=search_request.range_filter,
+            output_fields=search_request.output_fields,
+            filter=search_request.filter
+        )
+        
+        return results
+    except Exception as e:
+        logger.error(f"Error searching in Milvus with range parameters: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error searching in Milvus with range parameters: {str(e)}")
+
+
 @router.post("/delete")
 async def delete_from_milvus(
     delete_request: MilvusDeleteRequest,
@@ -119,14 +151,15 @@ async def query_milvus(
 
 @router.get("/count", response_model=CollectionCountResponse)
 async def count_milvus(
+    collection_name: Optional[str] = None,
     milvus_manager: MilvusManager = Depends(get_milvus_manager)
 ):
-    """Get the number of embeddings in the default Milvus collection."""
+    """Get the number of embeddings in the specified Milvus collection."""
     try:
         # Get count from Milvus
-        count = milvus_manager.count()
+        count = milvus_manager.count(collection_name)
         
-        return {"count": count}
+        return {"collection": collection_name, "count": count}
     except Exception as e:
         logger.error(f"Error getting count from Milvus: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error getting count from Milvus: {str(e)}")

@@ -29,6 +29,17 @@ class MilvusSearchRequest(BaseModel):
     filter: Optional[str] = None
 
 
+class MilvusRangeSearchRequest(BaseModel):
+    """Request for vector search with range parameters."""
+    texts: List[str]
+    collection_name: Optional[str] = None
+    limit: int = 5
+    radius: float = 0.4
+    range_filter: float = 0.9
+    output_fields: Optional[List[str]] = None
+    filter: Optional[str] = None
+
+
 class MilvusDeleteRequest(BaseModel):
     """Request for deletion operation."""
     collection_name: Optional[str] = None
